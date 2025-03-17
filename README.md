@@ -14,12 +14,13 @@ ansible --version
 ```
 
 ## Ansible Playbook: Установка PostgreSQL на сервер с наименьшей загрузкой CPU
+```
 project/
 ├── inventory/
 │   └── hosts
 ├── postgres.yml
 └── vars.yml
-
+```
 ### Описание
 Этот Playbook выполняет три основных шага:
 1. Собирает текущую загрузку CPU со всех серверов в группах `postgres_servers` и `centos_servers`.
