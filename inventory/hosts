@@ -1,0 +1,5 @@
+[postgres_servers]
+debian ansible_host=10.1.50.53 ansible_user=root
+
+[centos_servers]
+centos ansible_host=10.1.50.59 ansible_user=root

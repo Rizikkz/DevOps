@@ -1,0 +1,144 @@
+---
+# Play 1: Сбор нагрузки CPU с серверов из групп postgres_servers и centos_servers
+- name: Gather CPU load on all servers
+  hosts: postgres_servers,centos_servers
+  become: true
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: /usr/bin/python3  # Указываем интерпретатор Python 3
+  tasks:
+    - name: Get CPU load (первое число из /proc/loadavg)
+      shell: "awk '{print $1}' /proc/loadavg"
+      register: load_result
+      changed_when: false
+
+    - name: Set cpu_load fact for each host
+      set_fact:
+        cpu_load: "{{ load_result.stdout | float }}"
+
+# Play 2: Определение наименее нагруженного сервера и добавление его в группу target_server
+- name: Determine least loaded server and add to target group
+  hosts: postgres_servers,centos_servers
+  gather_facts: false
+  tasks:
+    - name: Find least loaded server (run_once)
+      run_once: true
+      set_fact:
+        least_loaded_server: "{{ (hostvars | dict2items 
+                                    | selectattr('value.cpu_load','defined') 
+                                    | sort(attribute='value.cpu_load') 
+                                    | first).key }}"
+    - name: Debug least loaded server (run_once)
+      run_once: true
+      debug:
+        msg: "Least loaded server is: {{ least_loaded_server }}"
+    - name: Add least loaded server to target group (run_once)
+      run_once: true
+      add_host:
+        name: "{{ least_loaded_server }}"
+        groups: target_server
+
+# Play 3: Установка и настройка PostgreSQL на сервере из группы target_server
+- name: Install and configure PostgreSQL on the least loaded server
+  hosts: target_server
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars.yml
+  vars:
+    # Получаем IP второго сервера из группы centos_servers (первый сервер из группы)
+    second_server_ip: "{{ groups['centos_servers'] | first | default('') | ternary(hostvars[groups['centos_servers'][0]].ansible_host, '') }}"
+  tasks:
+    - name: "Debug: Installing on {{ inventory_hostname }} (OS: {{ ansible_os_family }}, cpu_load: {{ cpu_load }})"
+      debug:
+        msg: "Installing PostgreSQL on {{ inventory_hostname }} (OS: {{ ansible_os_family }}, cpu_load: {{ cpu_load }})"
+
+    - name: Install PostgreSQL on Debian
+      apt:
+        name: postgresql
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install PostgreSQL on CentOS/AlmaLinux
+      yum:
+        name: postgresql-server
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Initialize PostgreSQL database (CentOS/AlmaLinux)
+      command: postgresql-setup initdb
+      args:
+        creates: /var/lib/pgsql/data/PG_VERSION
+      when: ansible_os_family == "RedHat"
+
+    - name: Start and enable PostgreSQL service
+      service:
+        name: postgresql
+        state: started
+        enabled: true
+
+    - name: Install psycopg2 library on Debian
+      apt:
+        name: python3-psycopg2
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Create PostgreSQL user 'student'
+      become: true
+      become_user: postgres
+      postgresql_user:
+        name: student
+        password: "{{ student_password }}"
+        encrypted: yes
+        no_password_changes: false
+
+    - name: Get PostgreSQL version on Debian
+      shell: "psql -V | awk '{print $3}' | cut -d'.' -f1"
+      register: pg_version_cmd
+      changed_when: false
+      when: ansible_os_family == "Debian"
+
+    - name: Set Debian PostgreSQL config paths
+      set_fact:
+        pg_conf_file: "/etc/postgresql/{{ pg_version_cmd.stdout }}/main/postgresql.conf"
+        pg_hba_file: "/etc/postgresql/{{ pg_version_cmd.stdout }}/main/pg_hba.conf"
+      when: ansible_os_family == "Debian"
+
+    - name: Set CentOS PostgreSQL config paths
+      set_fact:
+        pg_conf_file: "/var/lib/pgsql/data/postgresql.conf"
+        pg_hba_file: "/var/lib/pgsql/data/pg_hba.conf"
+      when: ansible_os_family == "RedHat"
+
+    - name: Configure PostgreSQL to listen on all IPs
+      lineinfile:
+        path: "{{ pg_conf_file }}"
+        regexp: '^#?listen_addresses'
+        line: "listen_addresses = '*'"
+      notify: restart_postgresql
+
+    - name: Allow external connection for user 'student' from second server IP
+      lineinfile:
+        path: "{{ pg_hba_file }}"
+        line: "host    all    student    {{ second_server_ip }}/32    md5"
+        create: yes
+      notify: restart_postgresql
+
+    - name: Test PostgreSQL connection with SQL query
+      become: true
+      become_user: postgres
+      shell: "psql -d postgres -c 'SELECT 1;'"
+      register: sql_test
+      changed_when: false
+      retries: 3
+      delay: 10
+
+    - name: Show SQL test output
+      debug:
+        msg: "SQL test output: {{ sql_test.stdout }}"
+
+  handlers:
+    - name: restart_postgresql
+      service:
+        name: postgresql
+        state: restarted
