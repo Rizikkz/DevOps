@@ -16,7 +16,7 @@
   add_host:
     name: "{{ least_loaded_server }}"
     groups: target_server
-  delegate_to: localhost  # 🔹 Добавляем хост в группу на localhost
+  delegate_to: localhost  
 
 - name: Debug target_server group
   run_once: true
@@ -26,7 +26,7 @@
 - name: Set global fact for least loaded server
   run_once: true
   set_fact:
-    least_loaded_host: "{{ least_loaded_server }}"  # 🔹 Исправлено
+    least_loaded_host: "{{ least_loaded_server }}" 
 
 - name: Find second server
   run_once: true
@@ -45,4 +45,4 @@
   add_host:
     name: "{{ second_server }}"
     groups: secondary_server
-  delegate_to: localhost  # 🔹 Делаем доступным глобально
+  delegate_to: localhost 

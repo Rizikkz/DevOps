@@ -42,12 +42,12 @@ DEVOPS/
 ```
 ### Описание
 Этот Playbook выполняет три основных шага:
-1. Собирает текущую загрузку CPU со всех серверов в группах `postgres_servers` и `centos_servers`.
+1. Собирает текущую загрузку CPU со всех серверов в группах `debian_servers` и `centos_servers`.
 2. Определяет сервер с минимальной загрузкой и добавляет его в группу `target_server`.
-3. Устанавливает и настраивает PostgreSQL на выбранном сервере.
-4. Выполняет проверку БД выполняя запрос sql  'SELECT 1  в установленой PostgreSQL
+3. Устанавливает и настраивает PostgreSQL на выбранном сервере, а на втором PostgreSQL client.
+4. Выполняет проверку БД выполняя запрос sql  'SELECT 1  в сервере с минимальной загрузкой
 
 ### Как запустить:
 ```bash
-ansible-playbook -i inventory/hosts postgres.yml 
+ansible-playbook -i ansible/inventory/hosts ansible/playbook.yml 
 ```
