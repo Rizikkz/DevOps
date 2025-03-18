@@ -1,25 +1,44 @@
 # DevOps
 Для реализаций необходимо что бы уже были 2 сервера, один на Debian, второй на CentOS (AlmaLinux)
-и на них был установлен ansible, а также на обоих серверах пользователю root подложен один и тот же открытый ssh ключ.
+и на них был установлен python3, а также на обоих серверах пользователю root подложен один и тот же открытый ssh ключ.
+запускаем скрипт он установит зависимости на хосты и добавить правило в firewalld для centos 
 ```bash
-sudo apt update && sudo apt install -y ansible  # Для Ubuntu/Debian
-sudo dnf install -y ansible  # Для CentOS/AlmaLinux
+./requirements.sh ansible/inventory/hosts
 ```
 Если при установки ansible возникли проблемы на  AlmaLinux 9,  Ansible не находится в стандартных репозиториях, потому что его переместили в EPEL. Чтобы установить Ansible, нужно выполнить следующие шаги:
 ```bash
 dnf install -y epel-release
 dnf config-manager --set-enabled crb
-dnf install -y ansible
-ansible --version
 ```
 
 ## Ansible Playbook: Установка PostgreSQL на сервер с наименьшей загрузкой CPU
 ```
-project/
-├── inventory/
-│   └── hosts
-├── postgres.yml
-└── vars.yml
+DEVOPS/
+├── ansible/
+│   └── inventory
+│        └── hosts
+│   └── roles
+        └── configure_postgresql
+             └── handlers
+                  └── main.yml
+             └── tasks
+                  └── main.yml
+        └── configure_postgresql_user
+             └── tasks
+                  └── main.yml
+        └── determine_least_loaded_server
+             └── tasks
+                  └── main.yml
+        └── gather_cpu_load
+             └── tasks
+                  └── main.yml
+        └── install_postgresql
+             └── tasks
+                  └── main.yml
+│   └── playbook.yml
+│   └── vars.yml
+├── README.md
+└── requirements.sh
 ```
 ### Описание
 Этот Playbook выполняет три основных шага:

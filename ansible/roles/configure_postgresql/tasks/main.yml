@@ -1,0 +1,72 @@
+---
+# - name: Set second server IP (CentOS)
+#   set_fact:
+#     second_server_ip: "{{ hostvars[groups['centos_servers'][0]].ansible_host | default('') }}"
+#   when: groups['centos_servers'] | length > 0
+
+# - name: Set second server IP (Debian)
+#   set_fact:
+#     second_server_ip: "{{ hostvars[groups['debian_servers'][0]].ansible_host | default('') }}"
+#   when: groups['debian_servers'] | length > 0
+
+- name: Set second server IP
+  set_fact:
+    second_server_ip: "{{ hostvars[second_server].ansible_host }}"
+  when: second_server is defined
+
+
+- name: Get PostgreSQL version on Debian
+  command: psql -V
+  register: pg_version_cmd_debian
+  changed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Extract PostgreSQL major version (Debian)
+  set_fact:
+    pg_version: "{{ pg_version_cmd_debian.stdout.split(' ')[2].split('.')[0] }}"
+  when: ansible_os_family == "Debian"
+
+- name: Get PostgreSQL version on CentOS
+  command: psql -V
+  register: pg_version_cmd_centos
+  changed_when: false
+  when: ansible_os_family == "RedHat"
+
+- name: Extract PostgreSQL major version (CentOS)
+  set_fact:
+    pg_version: "{{ pg_version_cmd_centos.stdout.split(' ')[2].split('.')[0] }}"
+  when: ansible_os_family == "RedHat"
+
+- name: Debug second_server_ip before modifying pg_hba.conf
+  debug:
+    msg: "Second server IP should be: {{ second_server_ip }}"
+
+
+- name: Set PostgreSQL config paths (Debian)
+  set_fact:
+    pg_conf_file: "/etc/postgresql/{{ pg_version }}/main/postgresql.conf"
+    pg_hba_file: "/etc/postgresql/{{ pg_version }}/main/pg_hba.conf"
+  when: ansible_os_family == "Debian"
+
+- name: Set PostgreSQL config paths (CentOS)
+  set_fact:
+    pg_conf_file: "/var/lib/pgsql/data/postgresql.conf"
+    pg_hba_file: "/var/lib/pgsql/data/pg_hba.conf"
+  when: ansible_os_family == "RedHat"
+
+- name: Configure PostgreSQL to listen on all IPs
+  lineinfile:
+    path: "{{ pg_conf_file }}"
+    regexp: '^#?listen_addresses'
+    line: "listen_addresses = '*'"
+  notify: restart_postgresql
+
+- name: Allow external connection for user 'student' from second server IP
+  lineinfile:
+    path: "{{ pg_hba_file }}"
+    line: "host    all    student    {{ second_server_ip }}/32    md5"
+    create: yes
+  notify: restart_postgresql
+
+- name: Ensure PostgreSQL is restarted
+  meta: flush_handlers

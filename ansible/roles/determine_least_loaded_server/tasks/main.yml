@@ -1,0 +1,48 @@
+- name: Find least loaded server (run_once)
+  run_once: true
+  set_fact:
+    least_loaded_server: "{{ (hostvars | dict2items 
+                                | selectattr('value.cpu_load','defined') 
+                                | sort(attribute='value.cpu_load') 
+                                | first).key }}"
+
+- name: Debug least loaded server (run_once)
+  run_once: true
+  debug:
+    msg: "Least loaded server is: {{ least_loaded_server }}"
+
+- name: Add least loaded server to target group (run_once)
+  run_once: true
+  add_host:
+    name: "{{ least_loaded_server }}"
+    groups: target_server
+  delegate_to: localhost  # 🔹 Добавляем хост в группу на localhost
+
+- name: Debug target_server group
+  run_once: true
+  debug:
+    msg: "Target server group: {{ groups['target_server'] | default([]) }}"
+
+- name: Set global fact for least loaded server
+  run_once: true
+  set_fact:
+    least_loaded_host: "{{ least_loaded_server }}"  # 🔹 Исправлено
+
+- name: Find second server
+  run_once: true
+  set_fact:
+    second_server: >-
+      {{ (groups['debian_servers'] | default([]) + groups['centos_servers'] | default([])) 
+         | difference([least_loaded_server]) | first | default('') }}
+
+- name: Debug second server
+  run_once: true
+  debug:
+    msg: "Second server is: {{ second_server }}"
+
+- name: Add second server to secondary_server group
+  run_once: true
+  add_host:
+    name: "{{ second_server }}"
+    groups: secondary_server
+  delegate_to: localhost  # 🔹 Делаем доступным глобально

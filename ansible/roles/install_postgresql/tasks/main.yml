@@ -1,0 +1,59 @@
+---
+- name: Determine if this host is the PostgreSQL target
+  set_fact:
+    is_postgres_target: "{{ inventory_hostname == least_loaded_host }}"
+
+- name: Debug host role
+  debug:
+    msg: "Host {{ inventory_hostname }} | is_postgres_target={{ is_postgres_target }} | ansible_os_family={{ ansible_os_family }}"
+
+- name: Install PostgreSQL server on Debian
+  apt:
+    name: postgresql
+    state: present
+    update_cache: yes
+  when: is_postgres_target and ansible_os_family == "Debian"
+
+- name: Install PostgreSQL client on CentOS (if target is Debian)
+  yum:
+    name: postgresql
+    state: present
+  when: not is_postgres_target and ansible_os_family == "RedHat"
+
+- name: Install PostgreSQL server on CentOS
+  yum:
+    name: postgresql-server
+    state: present
+  when: is_postgres_target and ansible_os_family == "RedHat"
+
+- name: Initialize PostgreSQL database on CentOS
+  command:
+    cmd: postgresql-setup initdb
+  args:
+    creates: /var/lib/pgsql/data/PG_VERSION
+  when: is_postgres_target and ansible_os_family == "RedHat"
+
+- name: Start and enable PostgreSQL service on CentOS
+  systemd:
+    name: postgresql
+    state: started
+    enabled: yes
+  when: is_postgres_target and ansible_os_family == "RedHat"
+
+- name: Debug conditions for PostgreSQL client installation on Debian
+  debug:
+    msg: "Host {{ inventory_hostname }} | is_postgres_target={{ is_postgres_target }} | ansible_os_family={{ ansible_os_family }}"
+
+- name: Install PostgreSQL client on Debian (if target is CentOS)
+  apt:
+    name: postgresql-client
+    state: present
+    update_cache: yes
+  when: not is_postgres_target and ansible_os_family == "Debian"
+
+- name: Start and enable PostgreSQL service on Debian
+  systemd:
+    name: postgresql
+    state: started
+    enabled: yes
+  when: is_postgres_target and ansible_os_family == "Debian"

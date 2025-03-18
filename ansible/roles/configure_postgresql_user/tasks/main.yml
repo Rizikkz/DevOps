@@ -1,0 +1,9 @@
+---
+- name: Create PostgreSQL user 'student'
+  become: true
+  become_user: postgres
+  postgresql_user:
+    name: student
+    password: "{{ student_password }}"
+    encrypted: yes
+    no_password_changes: false

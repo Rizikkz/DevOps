@@ -1,0 +1,6 @@
+student_password: "111"
+second_server_ip:
+  - "10.1.50.53"
+  - "10.1.50.59"
+
+postgresql_service_name: "{{ 'postgresql' if ansible_os_family == 'Debian' else 'postgresql' if ansible_distribution_major_version | int >= 8 else 'postgresql-server' }}"

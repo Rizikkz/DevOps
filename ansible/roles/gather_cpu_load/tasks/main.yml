@@ -1,0 +1,9 @@
+---
+- name: Get CPU load (первое число из /proc/loadavg)
+  shell: "awk '{print $1}' /proc/loadavg"
+  register: load_result
+  changed_when: false
+
+- name: Set cpu_load fact for each host
+  set_fact:
+    cpu_load: "{{ load_result.stdout | float }}"

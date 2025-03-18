@@ -1,0 +1,50 @@
+- name: Gather CPU load on all servers
+  hosts: debian_servers,centos_servers
+  become: true
+  gather_facts: false
+  roles:
+    - gather_cpu_load
+
+- name: Determine least loaded server and add to target group
+  hosts: debian_servers,centos_servers
+  gather_facts: false
+  roles:
+    - determine_least_loaded_server
+
+- name: Install and configure PostgreSQL on the least loaded server 
+  hosts: target_server
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars.yml
+  roles:
+    - install_postgresql
+    - configure_postgresql
+    - configure_postgresql_user
+
+- name: Install PostgreSQL client on the second server
+  hosts: secondary_server
+  become: true
+  gather_facts: true
+  roles:
+    - role: install_postgresql
+      when: inventory_hostname in groups['secondary_server']
+
+- name: Test PostgreSQL connection on target server
+  hosts: target_server
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Test PostgreSQL connection with SQL query
+      become: true
+      become_user: postgres
+      shell: "psql -d postgres -c 'SELECT 1;'"
+      register: sql_test
+      changed_when: false
+      retries: 3
+      delay: 10
+
+    - name: Show psql connection result
+      debug:
+        msg: "PSQL connection result: {{ sql_test.stdout }}"
+
