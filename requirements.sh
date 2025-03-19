@@ -14,9 +14,24 @@ if ! command -v ansible &> /dev/null; then
   exit 1
 fi
 
+# Установка sudo на Debian/Ubuntu, если отсутствует
+echo "Установка sudo на Debian/Ubuntu, если отсутствует..."
+ansible all -i "$INVENTORY_FILE" -m ansible.builtin.raw -a '
+  if [ -f /etc/debian_version ]; then
+    apt-get update -y && apt-get install -y sudo
+  fi
+' || true
+
+# Установка sudo на CentOS/RHEL, если отсутствует
+echo "Установка sudo на CentOS/RHEL, если отсутствует..."
+ansible all -i "$INVENTORY_FILE" -m ansible.builtin.raw -a '
+  if [ -f /etc/redhat-release ]; then
+    yum install -y sudo
+  fi
+' || true
+
 # Запуск установки зависимостей через Ansible
 echo "Запуск установки зависимостей на удалённых хостах..."
-
 ansible all -i "$INVENTORY_FILE" -m ansible.builtin.shell -a '
   if [ -f /etc/debian_version ]; then
     echo "Обнаружена Debian/Ubuntu система..."
